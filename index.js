@@ -4,6 +4,7 @@ const contrib = require("blessed-contrib");
 const { token, default_channel } = require("./config.json");
 
 let userchannel = default_channel;
+let currentGuildId = null;
 
 const client = new Client({
   intents: [
@@ -115,7 +116,6 @@ inputBox.key(["enter"], (ch, key) => {
         messagesBox.log("=================");
         break;
       case "c":
-        //const args = inputValue.slice(3).trim().split(" ");
         if (client.channels.cache.has(args[0])) {
           userchannel = args[0];
           messagesBox.log(`:c - Changed channel to: ${args[0]}`);
