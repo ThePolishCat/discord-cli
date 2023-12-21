@@ -4,8 +4,9 @@ const contrib = require("blessed-contrib");
 const { token, default_channel } = require("./config.json");
 
 let userchannel = default_channel;
-let currentGuildId = null;
-
+let currentGuildId;
+let guildList;
+let guildListNr = 0;
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -14,8 +15,8 @@ const client = new Client({
     GatewayIntentBits.GuildMembers,
   ],
 });
-const screen = blessed.screen();
-const messagesBox = contrib.log({
+const screen = blessed.screen({ smartCSR: true });
+const messagesBox = blessed.log({
   fg: "white",
   selectedFg: "white",
   label: " Discord Messages ",
@@ -27,8 +28,6 @@ const messagesBox = contrib.log({
   vi: true,
   alwaysScroll: true,
   scrollable: true,
-  border: { type: "line" },
-  style: { fg: "white", border: { fg: "cyan" } },
   scrollbar: {
     ch: " ",
     track: {
@@ -38,6 +37,8 @@ const messagesBox = contrib.log({
       inverse: true,
     },
   },
+  border: { type: "line" },
+  style: { fg: "white", border: { fg: "cyan" } },
 });
 
 const inputBox = blessed.textarea({
@@ -54,9 +55,23 @@ const inputBox = blessed.textarea({
 const sidebarBox = blessed.box({
   width: "20%",
   height: "90%",
+  label:"Servers and Channels:",
   right: 0,
   top: 0,
   border: { type: "line" },
+  keys: true,
+  vi: true,
+  alwaysScroll: true,
+  scrollable: true,
+  scrollbar: {
+    ch: " ",
+    track: {
+      bg: "cyan",
+    },
+    style: {
+      inverse: true,
+    },
+  },
   style: { fg: "white", border: { fg: "cyan" } },
 });
 
@@ -66,16 +81,21 @@ screen.append(sidebarBox);
 
 function updateSidebar() {
   const guilds = Array.from(client.guilds.cache.values());
-  sidebarBox.setContent("Servers and Channels:\n");
+  sidebarBox.setContent("");
 
   guilds.forEach((guild) => {
+    if (guild.id !== currentGuildId) {
+      return;
+    }
     sidebarBox.pushLine(`- ${guild.name}`);
     guild.channels.cache
       .filter((chan) => !chan.parent)
       .filter((cha) => cha.type === 0)
       .forEach((channel) => {
         const indicator = channel.id === userchannel ? " <--" : "";
-        sidebarBox.pushLine(`     - ${channel.name}${indicator}`);
+        sidebarBox.pushLine(
+          `     - ${channel.name}(${channel.id})${indicator}`
+        );
       });
     guild.channels.cache
       .filter((cat) => cat.type === 4)
@@ -85,7 +105,9 @@ function updateSidebar() {
           .filter((chan) => chan.parentId === category.id)
           .forEach((channel) => {
             const indicator = channel.id === userchannel ? " <--" : "";
-            sidebarBox.pushLine(`     - ${channel.name}${indicator}`);
+            sidebarBox.pushLine(
+              `     - ${channel.name}(${channel.id})${indicator}`
+            );
           });
       });
   });
@@ -98,9 +120,78 @@ screen.key(["i"], (ch, key) => {
   screen.render();
 });
 
+screen.key(["up", "down"], function (ch, key) {
+  if (key.name === "up") {
+    sidebarBox.scroll(-1);
+  } else if (key.name === "down") {
+    sidebarBox.scroll(1);
+  }
+  screen.render();
+});
+
+inputBox.key(["up", "down"], function (ch, key) {
+  if (key.name === "up") {
+    messagesBox.scroll(-1);
+  } else if (key.name === "down") {
+    messagesBox.scroll(1);
+  }
+  screen.render();
+});
+
+inputBox.key(["right"], (ch, key) => {
+  const guildCount = guildList.length - 1;
+  if (guildListNr !== guildCount) {
+    guildListNr = guildListNr + 1;
+    currentGuildId = guildList[guildListNr].id;
+    updateSidebar();
+  } else {
+    guildListNr = 0;
+    currentGuildId = guildList[guildListNr].id;
+    updateSidebar();
+  }
+});
+
+inputBox.key(["left"], (ch, key) => {
+  const guildCount = guildList.length - 1;
+  if (guildListNr !== 0) {
+    guildListNr = guildListNr - 1;
+    currentGuildId = guildList[guildListNr].id;
+    updateSidebar();
+  } else {
+    guildListNr = guildCount;
+    currentGuildId = guildList[guildListNr].id;
+    updateSidebar();
+  }
+});
+
+screen.key(["right"], (ch, key) => {
+  const guildCount = guildList.length - 1;
+  if (guildListNr !== guildCount) {
+    guildListNr = guildListNr + 1;
+    currentGuildId = guildList[guildListNr].id;
+    updateSidebar();
+  } else {
+    guildListNr = 0;
+    currentGuildId = guildList[guildListNr].id;
+    updateSidebar();
+  }
+});
+
+screen.key(["left"], (ch, key) => {
+  const guildCount = guildList.length - 1;
+  if (guildListNr !== 0) {
+    guildListNr = guildListNr - 1;
+    currentGuildId = guildList[guildListNr].id;
+    updateSidebar();
+  } else {
+    guildListNr = guildCount;
+    currentGuildId = guildList[guildListNr].id;
+    updateSidebar();
+  }
+});
+
 inputBox.key(["enter"], (ch, key) => {
   const inputValue = inputBox.getValue().trim();
-
   if (inputValue.startsWith(":")) {
     const [command, ...args] = inputValue.slice(1).trim().split(/\s+/);
 
@@ -110,9 +201,11 @@ inputBox.key(["enter"], (ch, key) => {
         break;
       case "h":
         messagesBox.log("=== Help Menu ===");
-        messagesBox.log(":h - Show this help menu");
-        messagesBox.log(":q - Exit the application");
-        messagesBox.log(":c - Change channel");
+        messagesBox.log(":h  - Show this help menu");
+        messagesBox.log(":q  - Exit the application");
+        messagesBox.log(":c  - Change channel");
+        messagesBox.log("esc - Enable servers scrool");
+        messagesBox.log("i   - Back to input mode from esc mode")
         messagesBox.log("=================");
         break;
       case "c":
@@ -147,6 +240,8 @@ client.on("messageCreate", (message) => {
 });
 
 client.once(Events.ClientReady, (readyClient) => {
+  currentGuildId = client.channels.cache.get(userchannel).guildId;
+  guildList = Array.from(client.guilds.cache.values());
   inputBox.readInput();
   updateSidebar();
 });
