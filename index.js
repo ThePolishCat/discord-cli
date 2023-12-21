@@ -50,12 +50,13 @@ const inputBox = blessed.textarea({
     fg: "white",
     bg: "black",
   },
+  label:" Input Box "
 });
 
 const sidebarBox = blessed.box({
   width: "20%",
   height: "90%",
-  label:"Servers and Channels:",
+  label:" Servers and Channels: ",
   right: 0,
   top: 0,
   border: { type: "line" },
@@ -114,11 +115,6 @@ function updateSidebar() {
 
   screen.render();
 }
-
-screen.key(["i"], (ch, key) => {
-  inputBox.focus();
-  screen.render();
-});
 
 screen.key(["up", "down"], function (ch, key) {
   if (key.name === "up") {
